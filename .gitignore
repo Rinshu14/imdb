@@ -2,6 +2,3 @@ node_modules
 tilldataString.js
 package.json
 package-lock.json
-*.pdf
-*.json
-*.xlxs
