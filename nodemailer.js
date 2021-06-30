@@ -236,12 +236,17 @@ if (process.argv.length > 2) {
                     document.querySelector(".ipc-btn__text").click();
                     let watchAnchor = document.querySelector(".ipc-button.ipc-button--full-width.ipc-button--center-align-content.ipc-button--large-height.ipc-button--core-accent1.ipc-button--theme-baseAlt.WatchBox__PrimaryWatchOptionButton-sc-1kx3ihk-0.cLzvdD");
                     let watchLink;
-                    if (watchAnchor != null) { 
-                        watchLink = watchAnchor.getAttribute("href"); 
+                    if (watchAnchor != null) {
+                        watchLink = watchAnchor.getAttribute("href");
                     }
                     let allAnchor = document.querySelectorAll(".ipc-link.ipc-link--baseAlt.ipc-link--inherit-color");
                     let review = allAnchor[3].getAttribute("href");
-                    return { rating, time, watchLink, review }
+                    let actorTag = document.querySelectorAll('[data-testid="title-cast-item__actor"]');
+                    let actor = []
+                    for (i = 0; i < actorTag.length; i++) {
+                        actor.push(actorTag[i].innerText);
+                    }
+                    return { rating, time, watchLink, review, actor }
 
                 })
                 objForSearched.review = "https://www.imdb.com" + finalConcat[0] + objForSearched.review
@@ -261,17 +266,29 @@ if (process.argv.length > 2) {
                     }
                     let watchBtn = document.querySelector(".ipc-button.buybox__button.promoted-watch-ad.ipc-button--core-base.ipc-button--full-width.ipc-button--default-height");
                     let watchLink;
-                    if (watchBtn != null) { 
-                        watchBtn.getAttribute("data-ipc-data"); 
+                    if (watchBtn != null) {
+                        watchBtn.getAttribute("data-ipc-data");
+                    }
+                    let alltr = document.querySelectorAll("tbody>tr"); let actor = [];
+                    for (let i = 1; i < alltr.length; i++) {
+                        let alltd = alltr[i].querySelectorAll("td");
+                        let anchor = alltd[1].querySelector("A");
+                        actor.push(anchor.innerText);
                     }
                     let review = "https://www.imdb.com/" + document.querySelectorAll(".quicklink")[2].getAttribute("href");
-                    return { rating, time, watchLink, review }
+                    return { rating, time, watchLink, review, actor }
                 })
 
+
             }
-            let dataString = "name= " + name + "\n" + "ratings= " + objForSearched.rating + "\n" + "duration= " + objForSearched.time + "\n" + "reviews=" + objForSearched.review + "\n";
+            //await page.goto(objForSearched.review);
+            console.log(objForSearched.actor);
+            let dataString = "> name= " + name + "\n" + "> ratings= " + objForSearched.rating + "\n" + "> duration= " + objForSearched.time + "\n" + "> reviews=" + objForSearched.review + "\n" + "cast" + "\n";
+            for (let i = 0; i < objForSearched.actor.length; i++) {
+                dataString = dataString + i + ". " + objForSearched.actor[i] + "\n";
+            }
             if (objForSearched.watchLink != null) {
-                dataString = dataString + "watchLink= " + objForSearched.watchLink;
+                dataString = dataString + "> watchLink= " + objForSearched.watchLink;
 
             }
             createPdf("serched.pdf", dataString);
@@ -296,7 +313,7 @@ if (process.argv.length > 2) {
                     console.log('Email sent: ' + info.response);
                 }
             });
-            browser.close();
+            //browser.close();
         }
         //if movie not entered
         else {
