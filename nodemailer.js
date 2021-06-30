@@ -1,3 +1,4 @@
+
 const { jsPDF } = require("jspdf");
 const fs = require("fs");
 const json2xls = require("json2xls");
@@ -14,7 +15,7 @@ if (process.argv.length > 2) {
 
         const browser = await puppeteer.launch({
             headless: false,
-            slowMo: 5,
+            slowMo: 20,
             defaultViewPort: null,
             args: ["--start-maximized"],
         });
@@ -196,7 +197,7 @@ if (process.argv.length > 2) {
         //create excel file
         let excel = json2xls(data);
         fs.writeFileSync('data.xlsx', excel, 'binary');
-        
+
         //check movie entered or not
         //if yes
         if (name != null) {
@@ -204,24 +205,24 @@ if (process.argv.length > 2) {
             await page.waitForSelector("#suggestion-search");
             await page.click("#suggestion-search");
             await page.type("#suggestion-search", name);
-            
+
             await Promise.all([
                 page.keyboard.down("Enter"),
                 page.waitForNavigation(),
             ]);
-            
+
             await page.waitForSelector(".result_text>a");
             let reviewsconcat = await page.evaluate(function () {
                 let link = document.querySelector(".result_text>a").getAttribute("href");
                 return link;
             })
-            
+
             let finalConcat = reviewsconcat.split("?");
             await Promise.all([
                 page.click(".result_text>a"),
                 page.waitForNavigation(),
             ]);
-            
+
             let checkSlector = []
             checkSlector = await page.$$(".AggregateRatingButton__RatingScore-sc-1il8omz-1.fhMjqK");
             let objForSearched = {};
@@ -234,53 +235,68 @@ if (process.argv.length > 2) {
                     //to add in watchlist
                     document.querySelector(".ipc-btn__text").click();
                     let watchAnchor = document.querySelector(".ipc-button.ipc-button--full-width.ipc-button--center-align-content.ipc-button--large-height.ipc-button--core-accent1.ipc-button--theme-baseAlt.WatchBox__PrimaryWatchOptionButton-sc-1kx3ihk-0.cLzvdD");
-                    let watchLink = watchAnchor.getAttribute("href");
+                    let watchLink;
+                    if (watchAnchor != null) { 
+                        watchLink = watchAnchor.getAttribute("href"); 
+                    }
                     let allAnchor = document.querySelectorAll(".ipc-link.ipc-link--baseAlt.ipc-link--inherit-color");
                     let review = allAnchor[3].getAttribute("href");
                     return { rating, time, watchLink, review }
 
                 })
-                objForSearched.review = "https://www.imdb.com" + finalConcat[0] + obj.review
+                objForSearched.review = "https://www.imdb.com" + finalConcat[0] + objForSearched.review
 
             }
             else {
+                await page.waitForSelector('[itemprop="ratingValue"]');
                 objForSearched = await page.evaluate(function () {
-                    let rating = document.querySelector('[itemprop="ratingValue"]').innerText;
-                    let allTime = document.querySelectorAll('[datetime="PT134M"]');
-                    let time = allTime[0].innerText;
+                    let rating = document.querySelector('[itemprop="ratingValue"]');
+                    let timeTag = document.querySelectorAll(".subtext>time");
+                    let time = timeTag.innerText;
+
                     //add to watchlist
-                    document.querySelector(".ipc-button.ipc-secondary-button.uc-add-wl-button-icon--add.watchlist--title-main-desktop.ipc-button--core-base.ipc-button--on-textPrimary.ipc-button--single-padding.ipc-button--default-height").click();
+                    let addTolist = document.querySelector(".wl-ribbon.standalone.not-inWL");
+                    if (addTolist != null) {
+                        addTolist.click();
+                    }
                     let watchBtn = document.querySelector(".ipc-button.buybox__button.promoted-watch-ad.ipc-button--core-base.ipc-button--full-width.ipc-button--default-height");
-                    let watchLink = watchBtn.getAttribute("data-ipc-data");
+                    let watchLink;
+                    if (watchBtn != null) { 
+                        watchBtn.getAttribute("data-ipc-data"); 
+                    }
                     let review = "https://www.imdb.com/" + document.querySelectorAll(".quicklink")[2].getAttribute("href");
                     return { rating, time, watchLink, review }
                 })
 
             }
-           let dataString = "name= " + name + "\n" + "ratings= " + objForSearched.rating + "\n" + "duration= " + objForSearched.time + "\n" + "reviews=" + objForSearched.review + "\n" + "watchLink= " + objForSearched.watchLink;
+            let dataString = "name= " + name + "\n" + "ratings= " + objForSearched.rating + "\n" + "duration= " + objForSearched.time + "\n" + "reviews=" + objForSearched.review + "\n";
+            if (objForSearched.watchLink != null) {
+                dataString = dataString + "watchLink= " + objForSearched.watchLink;
+
+            }
             createPdf("serched.pdf", dataString);
-            
+
             var mailOptions = {
                 from: 'riya14rani@gmail.com',
                 to: 'rajputrinshu@gmail.com',
                 subject: 'Sending Email using Node.js',
                 text: 'your pdf',
                 attachments: [
-                  {
-                      filename: "serched.pdf",
-                       path: "D:" +"\serched.pdf" ,
-                      cid: 'uniq-serched.pdf'
-                  }
-              ]
-              };
-              transporter.sendMail(mailOptions, function(error, info){
+                    {
+                        filename: "serched.pdf",
+                        path: "D:" + "\serched.pdf",
+                        cid: 'uniq-serched.pdf'
+                    }
+                ]
+            };
+            transporter.sendMail(mailOptions, function (error, info) {
                 if (error) {
-                  console.log(error);
+                    console.log(error);
                 } else {
-                  console.log('Email sent: ' + info.response);
+                    console.log('Email sent: ' + info.response);
                 }
-              });
-              browser.close();
+            });
+            browser.close();
         }
         //if movie not entered
         else {
