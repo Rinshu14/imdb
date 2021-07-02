@@ -1,26 +1,25 @@
-
 const { jsPDF } = require("jspdf");
 const fs = require("fs");
-//const json2xls = require("json2xls");
 const xlsx = require("xlsx")
 const puppeteer = require("puppeteer");
 const readline = require('readline');
 var nodemailer = require('nodemailer');
-let name = null;
-if (process.argv.length > 2) {
-    name = process.argv[2];
-}
-
+const chalk = require("chalk");
+const { RSA_X931_PADDING } = require("constants");
 (
     async function () {
 
         const browser = await puppeteer.launch({
             headless: false,
-            slowMo: 20,
+            slowMo: 10,
             defaultViewPort: null,
             args: ["--start-maximized"],
         });
 
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
 
         var transporter = nodemailer.createTransport({
             service: 'gmail',
@@ -36,6 +35,7 @@ if (process.argv.length > 2) {
         let moviesRating = [];
         let watchLink = [];
         let allReviewLinks = [];
+
         const page = await browser.newPage();
         await page.setViewport({ width: 0, height: 0 });
         await page.goto("https://www.imdb.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.imdb.com%2Fregistration%2Fap-signin-handler%2Fimdb_us&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=imdb_us&openid.mode=checkid_setup&siteState=eyJvcGVuaWQuYXNzb2NfaGFuZGxlIjoiaW1kYl91cyIsInJlZGlyZWN0VG8iOiJodHRwczovL3d3dy5pbWRiLmNvbS8_cmVmXz1sb2dpbiJ9&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&tag=imdbtag_reg-20");
@@ -54,6 +54,7 @@ if (process.argv.length > 2) {
             page.click("#imdbHeader-navDrawerOpen--desktop"),
             page.waitForNavigation(),
         ]);
+
         //return link of toprated movies page link 
         await page.waitForSelector(".ipc-list__item.nav-link.NavLink-sc-19k0khm-0.dvLykY.ipc-list__item--indent-one", { visible: true });
         let topRatedMovies = await page.evaluate(function () {
@@ -61,6 +62,7 @@ if (process.argv.length > 2) {
             let actualLink = "https://www.imdb.com/" + intermediateLink[2].getAttribute("href");
             return actualLink;
         })
+
         //goto top rated movies page and fatch top 10 movies 
         //with ratings and watch links and if they are not added in watchlist then add
         //otherwise do nothing
@@ -168,6 +170,7 @@ if (process.argv.length > 2) {
                 })
             }
         }
+
         function createJson(moviesName, rating, watchlink, reviewlink, duration) {
             let detail = {
                 Name: moviesName,
@@ -178,6 +181,7 @@ if (process.argv.length > 2) {
             };
             data.push(detail);
         }
+
         function createPdf(fileName, topTwoReview) {
             const doc = new jsPDF(
                 {
@@ -195,10 +199,8 @@ if (process.argv.length > 2) {
         }
 
         fs.writeFileSync("data1.json", JSON.stringify(data));
-        //create excel file
-        // let excel = json2xls(data);
-        // fs.writeFileSync('data.xlsx', excel, 'binary');
-        var rawFile = fs.readFileSync("./data1.json")//dir of your json file as param
+
+        var rawFile = fs.readFileSync("./data1.json")
         function createxcel() {
             var raw = JSON.parse(rawFile)
             var files = []
@@ -217,13 +219,33 @@ if (process.argv.length > 2) {
                 { wch: 55 },
             ]
             newWS['!cols'] = wscols;
-            xlsx.utils.book_append_sheet(newWB, newWS, "name")//workbook name as param
-            xlsx.writeFile(newWB, "data2.xlsx")//file name as param
+            xlsx.utils.book_append_sheet(newWB, newWS, "name")
+            xlsx.writeFile(newWB, "data2.xlsx")
         }
-         createxcel();
-        //check movie entered or not
-        //if yes
-        if (name != undefined) {
+        createxcel();
+        //enter movie
+        function ask() {
+            return new Promise((resolve, reject) => {
+                rl.question(chalk.yellowBright.bold('do you want to search a movie '), function(input){ resolve(input)});
+            });
+        }
+        let name;
+        await ask()
+            .then(function (result) {
+                if (result == "yes") {
+                    return new Promise((resolve, reject) => {
+                        rl.question(chalk.yellowBright.bold('Enter movie: '), function (input) 
+                        { 
+                            resolve(input) 
+                        });
+                    });
+                }
+            })
+            .then(function (input) {
+                name = input;
+            })
+
+        if (name != null) {
             await page.goto("https://www.imdb.com/");
             await page.waitForSelector("#suggestion-search");
             await page.click("#suggestion-search");
@@ -256,7 +278,9 @@ if (process.argv.length > 2) {
                     let allli = document.querySelectorAll(".TitleBlock__TitleMetaDataContainer-sc-1nlhx7j-2.hWHMKr>ul>li");
                     let time = allli[2].innerText;
                     //to add in watchlist
-                    document.querySelector(".ipc-btn__text").click();
+                    if (rating >= 5) {
+                        document.querySelector(".ipc-btn__text").click();
+                    }
                     let watchAnchor = document.querySelector(".ipc-button.ipc-button--full-width.ipc-button--center-align-content.ipc-button--large-height.ipc-button--core-accent1.ipc-button--theme-baseAlt.WatchBox__PrimaryWatchOptionButton-sc-1kx3ihk-0.cLzvdD");
                     let watchLink;
                     if (watchAnchor != null) {
@@ -283,9 +307,11 @@ if (process.argv.length > 2) {
                     let time = timeTag.innerText;
 
                     //add to watchlist
-                    let addTolist = document.querySelector(".wl-ribbon.standalone.not-inWL");
-                    if (addTolist != null) {
-                        addTolist.click();
+                    if (rating >= 5) {
+                        let addTolist = document.querySelector(".wl-ribbon.standalone.not-inWL");
+                        if (addTolist != null) {
+                            addTolist.click();
+                        }
                     }
                     let watchBtn = document.querySelector(".ipc-button.buybox__button.promoted-watch-ad.ipc-button--core-base.ipc-button--full-width.ipc-button--default-height");
                     let watchLink;
@@ -302,28 +328,54 @@ if (process.argv.length > 2) {
                     return { rating, time, watchLink, review, actor }
                 })
             }
-            //await page.goto(objForSearched.review);
-            console.log(objForSearched.actor);
-            let dataString = "> name= " + name + "\n" + "> ratings= " + objForSearched.rating + "\n" + "> duration= " + objForSearched.time + "\n" + "> reviews=" + objForSearched.review + "\n" + "cast" + "\n";
+            await page.goto(objForSearched.review);
+            await page.waitForSelector(".lister-item-content")
+            let searchTopTwoReview = await page.evaluate(function () {
+                let topTwoReview=[];
+                let allLi = document.querySelectorAll(".lister-item-content");
+                for(let i=0;i<2;i++)
+                {
+                    searchReview = allLi[i].querySelector("a.title").innerText;
+                    topTwoReview.push("\n" + (i + 1) + ". " + searchReview);
+                }
+                return topTwoReview
+            })
+            let dataString = "> name= " + name + "\n" + "> ratings= " + objForSearched.rating + "\n" + "> duration= " + objForSearched.time + "\n" + "> reviews=" + objForSearched.review + "\n" + "> cast" + "\n";
             for (let i = 0; i < objForSearched.actor.length; i++) {
-                dataString = dataString + i + ". " + objForSearched.actor[i] + "\n";
+                dataString = dataString + (i + 1) + ". " + objForSearched.actor[i] + "\n";
             }
             if (objForSearched.watchLink != null) {
-                dataString = dataString + "> watchLink= " + objForSearched.watchLink;
+                dataString = dataString + "> watchLink= " + objForSearched.watchLink+"\n"+">";
 
             }
-            createPdf("serched.pdf", dataString);
-
+            
+            for(let i=0;i<searchTopTwoReview.length;i++)
+            {
+                dataString=dataString+searchTopTwoReview[i];
+            }
+            createPdf("SEARCHED.pdf", dataString);
+            let mailId;
+            function askmail() {
+                return new Promise((resolve, reject) => {
+                    rl.question(chalk.yellowBright.bold('Enter mailid'), function(input) 
+                    {
+                        resolve(input)
+                    });
+                });
+            }
+            await askmail().then(function (input) {
+                mailId = input;
+            })
             var mailOptions = {
                 from: 'riya14rani@gmail.com',
-                to: 'rajputrinshu@gmail.com',
+                to: mailId,
                 subject: 'Sending Email using Node.js',
                 text: 'your pdf',
                 attachments: [
                     {
-                        filename: "serched.pdf",
-                        path: "D:" + "\serched.pdf",
-                        cid: 'uniq-serched.pdf'
+                        filename: "SEARCHED.pdf",
+                        path: "D:" + "\SEARCHED.pdf",
+                        cid: 'uniq-SEARCHED.pdf'
                     }
                 ]
             };
@@ -334,13 +386,11 @@ if (process.argv.length > 2) {
                     console.log('Email sent: ' + info.response);
                 }
             });
-            //browser.close();
+            browser.close();
         }
         //if movie not entered
         else {
             browser.close();
         }
-
-
     }
 )();
